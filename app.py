@@ -229,11 +229,12 @@ if st.sidebar.button("🧹 Limpar Sessão"):
     st.rerun()
 
 # --------------------------------------------------
-# FLUXO PRINCIPAL DA APLICAÇÃO
+# FLUXO PRINCIPAL DA APLICAÇÃO (VERSÃO CORRIGIDA)
 # --------------------------------------------------
 st.title("👨‍🏫 Gerador de Roteiros para Aulas de Análise Criminal")
 
 def exibir_dados_json(dados):
+    # ... (esta função permanece a mesma, não precisa alterar)
     st.header(f"Roteiro carregado (Criado em: {dados.get('criado_em', 'Data desconhecida')})")
     roteiros_carregados = {}
     for slide, info in dados["slides"].items():
@@ -242,12 +243,11 @@ def exibir_dados_json(dados):
         except (AttributeError, ValueError):
             num = slide
         roteiros_carregados[num] = info["roteiro"]
-        with st.expander(f"📚 {slide} – {info.get('tema', 'Sem tema')}", expanded=False):
-            st.write(info["roteiro"])
     st.session_state.roteiros_atuais = roteiros_carregados
-    st.info("Roteiro carregado. Use o botão 'Baixar Roteiro em PDF' na barra lateral.")
+    st.info("Roteiro carregado. Use o botão 'Baixar Roteiro em PDF' na barra lateral se desejar.")
     st.rerun()
 
+# --- Bloco de Carregamento de JSON (permanece igual) ---
 if carregar_btn and json_nome:
     try:
         with open(JSON_DIR / json_nome, "r", encoding="utf-8") as f:
@@ -265,6 +265,7 @@ if json_ext:
         st.error(f"Erro ao carregar o arquivo JSON externo: {e}")
     st.stop()
 
+# --- Bloco de Geração (com a primeira correção) ---
 if gerar_btn and pdf_up:
     st.session_state.generator_used = True
     try:
@@ -296,12 +297,11 @@ if gerar_btn and pdf_up:
         num_slide = pag_ini + idx
         tipo = "inicial" if idx == 0 else "final" if idx == total_slides - 1 else "intermediário"
         tempo_alocado_segundos = next((item['tempo_atribuido_segundos'] for item in plano_de_tempo if item.get("slide_num") == num_slide), 30)
-
         barra.progress((idx) / total_slides, text=f"✍️ Etapa 2: Gerando roteiro para Slide {num_slide}/{pag_fim} ({tempo_alocado_segundos}s)...")
-        roteiros[num_slide] = gerar_roteiro_para_um_slide(num_slide, txt, tempo_alocado_segundos, tipo, anterior)
-        anterior = roteiros[num_slide]
-        with st.expander(f"📚 Slide {num_slide} (Tempo: {tempo_alocado_segundos}s)", expanded=True):
-            st.write(roteiros[num_slide])
+        
+        roteiro_gerado = gerar_roteiro_para_um_slide(num_slide, txt, tempo_alocado_segundos, tipo, anterior)
+        roteiros[num_slide] = roteiro_gerado
+        anterior = roteiro_gerado
     
     barra.progress(1.0, text="✅ Geração Concluída!")
     st.session_state.roteiros_atuais = roteiros
@@ -318,6 +318,17 @@ if gerar_btn and pdf_up:
     st.success("Roteiro gerado! Você pode baixar o PDF na barra lateral.")
     st.rerun()
 
-# Mensagem inicial se nenhuma ação foi tomada
-if not any([st.session_state.get("generator_used"), json_ext, (carregar_btn and json_nome)]):
+# --- NOVO BLOCO: Lógica para exibir o roteiro salvo na sessão ---
+# Este bloco garante que o roteiro permaneça na tela após o st.rerun()
+if 'roteiros_atuais' in st.session_state:
+    st.subheader("Roteiro Gerado")
+    # Itera sobre os roteiros salvos e os exibe
+    for num, texto_roteiro in st.session_state.roteiros_atuais.items():
+        # A correção do dólar é aplicada aqui também!
+        texto_seguro = texto_roteiro.replace('$', r'\$')
+        with st.expander(f"📚 Slide {num}", expanded=True):
+            st.write(texto_seguro)
+
+# --- Mensagem inicial (agora no final) ---
+elif not any([st.session_state.get("generator_used"), json_ext, (carregar_btn and json_nome)]):
     st.info("Para começar, carregue um arquivo PDF na barra lateral, defina o intervalo de páginas, o tempo total da apresentação e clique em 'Gerar Roteiros'.")
